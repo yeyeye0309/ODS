@@ -1,0 +1,1209 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, user-scalable=yes">
+    <title>雅思基础词汇 在线默写 - C</title>
+    <!-- 引入html2canvas和jsPDF CDN -->
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/html2canvas/1.4.1/html2canvas.min.js"></script>
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/jspdf/2.5.1/jspdf.umd.min.js"></script>
+    <style>
+        /* 全局防作弊：禁止选择文本、禁止长按菜单 */
+        * {
+            -webkit-touch-callout: none;      /* 禁止长按弹出菜单 (iOS) */
+            -webkit-user-select: none;        /* 禁止选择文本 (Safari) */
+            user-select: none;                /* 标准语法 */
+            -webkit-tap-highlight-color: transparent; /* 去掉点击高亮 */
+        }
+        /* 输入框内允许正常编辑、选择 */
+        input {
+            -webkit-user-select: text;
+            user-select: text;
+            -webkit-touch-callout: default;
+        }
+        /* 其他样式保持不变 */
+        * { box-sizing: border-box; margin: 0; padding: 0; }
+        body {
+            font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', 'PingFang SC', 'Microsoft YaHei', sans-serif;
+            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+            min-height: 100vh;
+            padding: 20px;
+        }
+        .container {
+            max-width: 1000px;
+            margin: 0 auto;
+            background: white;
+            border-radius: 20px;
+            box-shadow: 0 20px 60px rgba(0,0,0,0.3);
+            overflow: hidden;
+        }
+        .header {
+            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+            color: white;
+            padding: 30px;
+            text-align: center;
+        }
+        .header h1 { font-size: 28px; margin-bottom: 10px; }
+        .header p { opacity: 0.9; font-size: 14px; }
+        .student-info {
+            background: #f8f9fa;
+            padding: 15px 30px;
+            border-bottom: 1px solid #e0e0e0;
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            flex-wrap: wrap;
+            gap: 15px;
+        }
+        .student-info label { font-weight: 600; color: #333; }
+        .student-info input {
+            padding: 8px 12px;
+            border: 1px solid #ccc;
+            border-radius: 6px;
+            font-size: 14px;
+            width: 200px;
+        }
+        .timer-bar {
+            background: #f0f0f0;
+            padding: 15px 30px;
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            border-bottom: 1px solid #e0e0e0;
+        }
+        .timer { font-size: 32px; font-weight: bold; font-family: monospace; color: #e74c3c; }
+        .timer.warning { color: #e74c3c; animation: blink 1s step-start infinite; }
+        @keyframes blink { 50% { opacity: 0.5; } }
+        .controls button { padding: 8px 20px; margin-left: 10px; border: none; border-radius: 8px; font-size: 14px; cursor: pointer; font-weight: 600; }
+        .btn-start { background: #27ae60; color: white; }
+        .btn-pause { background: #f39c12; color: white; }
+        .btn-reset { background: #e74c3c; color: white; }
+        .progress-bar { height: 4px; background: #e0e0e0; position: relative; }
+        .progress-fill { height: 100%; background: linear-gradient(90deg, #667eea, #764ba2); width: 0%; transition: width 0.3s; }
+        .content { padding: 30px; }
+        .tips {
+            background: #e7f3ff;
+            border-left: 4px solid #667eea;
+            padding: 12px 16px;
+            margin-bottom: 20px;
+            border-radius: 0 8px 8px 0;
+            font-size: 13px;
+            color: #555;
+        }
+        .mode-selector {
+            display: flex;
+            gap: 10px;
+            margin-bottom: 20px;
+            align-items: center;
+        }
+        .shuffle-btn {
+            background: #9b59b6;
+            color: white;
+            padding: 8px 20px;
+            border: none;
+            border-radius: 8px;
+            cursor: pointer;
+            font-size: 13px;
+            font-weight: 600;
+            margin-left: auto;
+        }
+        .word-grid {
+            display: grid;
+            grid-template-columns: repeat(auto-fill, minmax(250px, 1fr));
+            gap: 12px;
+        }
+        .word-item {
+            display: flex;
+            align-items: center;
+            gap: 10px;
+            padding: 10px 14px;
+            background: #f8f9fa;
+            border-radius: 10px;
+            border: 2px solid transparent;
+        }
+        .word-num {
+            width: 28px; height: 28px;
+            background: #667eea;
+            color: white;
+            border-radius: 50%;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            font-size: 12px;
+            font-weight: bold;
+            flex-shrink: 0;
+        }
+        .word-input {
+            flex: 1;
+            padding: 8px 12px;
+            border: 1px solid #ddd;
+            border-radius: 6px;
+            font-size: 14px;
+        }
+        .word-input:focus { border-color: #667eea; outline: none; }
+        .word-answer { display: none; font-size: 12px; color: #666; margin-left: 5px; }
+        .word-item.correct { background: #d4edda; border-color: #28a745; }
+        .word-item.wrong { background: #f8d7da; border-color: #dc3545; }
+        .word-item.pending { background: #fff3cd; border-color: #ffc107; }
+        .word-item.correct .word-num { background: #28a745; }
+        .word-item.wrong .word-num { background: #dc3545; }
+        .word-item.pending .word-num { background: #ffc107; }
+        .stats {
+            display: grid;
+            grid-template-columns: repeat(4, 1fr);
+            gap: 15px;
+            margin-top: 20px;
+            padding: 20px;
+            background: #f8f9fa;
+            border-radius: 12px;
+        }
+        .stat-box { text-align: center; padding: 15px; background: white; border-radius: 10px; }
+        .stat-num { font-size: 28px; font-weight: bold; color: #667eea; }
+        .action-bar { display: flex; gap: 10px; margin-top: 20px; justify-content: center; }
+        .action-btn { padding: 12px 30px; border: none; border-radius: 10px; font-size: 15px; font-weight: 600; cursor: pointer; }
+        .btn-submit { background: linear-gradient(135deg, #667eea, #764ba2); color: white; }
+        .btn-export { background: #17a2b8; color: white; }
+        .result-panel {
+            display: none;
+            margin-top: 20px;
+            padding: 25px;
+            background: #f8f9fa;
+            border-radius: 15px;
+            text-align: center;
+        }
+        .result-panel.show { display: block; }
+        .score-circle {
+            width: 120px; height: 120px;
+            border-radius: 50%;
+            background: conic-gradient(#28a745 var(--score-deg), #e0e0e0 var(--score-deg));
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            margin: 0 auto 20px;
+            position: relative;
+        }
+        .score-circle::before {
+            content: '';
+            width: 100px; height: 100px;
+            background: white;
+            border-radius: 50%;
+            position: absolute;
+        }
+        .score-text { position: relative; font-size: 32px; font-weight: bold; color: #333; }
+        .mistake-list { text-align: left; margin-top: 15px; max-height: 200px; overflow-y: auto; }
+        .mistake-item {
+            padding: 8px 12px;
+            background: white;
+            border-radius: 6px;
+            margin-bottom: 6px;
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+        }
+        .mistake-item .your-answer { color: #dc3545; text-decoration: line-through; }
+        .mistake-item .correct-answer { color: #28a745; font-weight: 600; }
+        /* PDF专用错题表格样式 */
+        #pdf-export-container {
+            position: absolute;
+            left: -9999px;
+            top: -9999px;
+            width: 800px;
+            background: white;
+            padding: 20px;
+            font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', 'PingFang SC', 'Microsoft YaHei', sans-serif;
+        }
+        .pdf-table {
+            width: 100%;
+            border-collapse: collapse;
+            margin-top: 15px;
+        }
+        .pdf-table th, .pdf-table td {
+            border: 1px solid #ddd;
+            padding: 10px;
+            text-align: left;
+            vertical-align: top;
+        }
+        .pdf-table th {
+            background-color: #667eea;
+            color: white;
+            font-weight: 600;
+        }
+        .pdf-table tr:nth-child(even) {
+            background-color: #f8f9fa;
+        }
+        .wrong-word {
+            color: #dc3545;
+            font-weight: 500;
+        }
+        .correct-answer-pdf {
+            color: #28a745;
+            font-weight: 500;
+        }
+        @media (max-width: 600px) {
+            .word-grid { grid-template-columns: 1fr; }
+            .stats { grid-template-columns: repeat(2, 1fr); }
+            .timer { font-size: 24px; }
+        }
+    </style>
+</head>
+<body>
+<div class="container">
+    <div class="header">
+        <h1>📝 雅思基础词汇 在线默写</h1>
+        <p>C | 共 100 个单词 | 提交后才显示答案 | 倒计时15分钟</p>
+    </div>
+
+    <div class="student-info">
+        <div><label>👩‍🎓 学生姓名：</label> <input type="text" id="studentName" placeholder="请输入你的名字"></div>
+        <div><label>📅 测试日期：</label> 2026.05.24</div>
+        <div><label>📖 默写范围：</label> List9,8</div>
+    </div>
+
+    <div class="timer-bar">
+        <div class="timer" id="timer">15:00</div>
+        <div class="controls">
+            <button class="btn-start" id="btnStart" onclick="startQuiz()">▶ 开始默写</button>
+            <button class="btn-pause" id="btnPause" onclick="pauseQuiz()" style="display:none">⏸ 暂停</button>
+            <button class="btn-reset" onclick="resetQuiz()">↺ 重置</button>
+        </div>
+    </div>
+    <div class="progress-bar"><div class="progress-fill" id="progressFill"></div></div>
+
+    <div class="content">
+        <div class="tips">
+            <strong>💡 提示：</strong>点击"开始默写"后倒计时开始，在输入框中填写英文单词对应的中文释义。系统支持模糊匹配（忽略标点、大小写）。按 Enter 键快速跳转。答案仅在提交后显示。倒计时结束将自动提交。
+        </div>
+
+        <div style="display:flex; align-items:center; margin-bottom:15px; gap:10px; flex-wrap:wrap;">
+            <div class="mode-selector">
+                <span style="font-weight:600;">📌 模式：英 → 中</span>
+            </div>
+            <button class="shuffle-btn" onclick="shuffleWords()">🔀 打乱顺序</button>
+        </div>
+
+        <div class="word-grid" id="wordGrid"></div>
+
+        <div class="action-bar">
+            <button class="action-btn btn-submit" onclick="submitQuiz()">✓ 提交批改</button>
+            <button class="action-btn btn-export" onclick="exportToPDF()">📥 导出 PDF 报告</button>
+        </div>
+
+        <div class="stats" id="stats">
+            <div class="stat-box"><div class="stat-num" id="statTotal">0</div><div class="stat-label">总题数</div></div>
+            <div class="stat-box"><div class="stat-num" id="statCorrect" style="color:#28a745">0</div><div class="stat-label">正确</div></div>
+            <div class="stat-box"><div class="stat-num" id="statWrong" style="color:#dc3545">0</div><div class="stat-label">错误</div></div>
+            <div class="stat-box"><div class="stat-num" id="statPending" style="color:#ffc107">0</div><div class="stat-label">未答</div></div>
+        </div>
+
+        <div class="result-panel" id="resultPanel">
+            <div class="score-circle" id="scoreCircle"><div class="score-text" id="scoreText">0%</div></div>
+            <h3 id="resultTitle">默写完成！</h3>
+            <p id="resultDesc"></p>
+            <div class="mistake-list" id="mistakeList"></div>
+        </div>
+    </div>
+</div>
+
+<!-- 隐藏的PDF导出容器，专门用于生成错题表格 -->
+<div id="pdf-export-container"></div>
+
+<script>
+    const vocabularyDB = {
+  "malaria": [
+    "n.疟疾"
+  ],
+  "posture": [
+    "n.姿势",
+    "姿态"
+  ],
+  "severity": [
+    "n.严重",
+    "严厉",
+    "艰苦",
+    "严峻"
+  ],
+  "scope": [
+    "n.(话题",
+    "活动",
+    "题目等的）范围",
+    "（供采取行动",
+    "思考等的）机会",
+    "余地"
+  ],
+  "rhythm": [
+    "n.韵律",
+    "节奏",
+    "规则变化"
+  ],
+  "scatter": [
+    "v.散开",
+    "分散",
+    "驱散",
+    "撒",
+    "散播"
+  ],
+  "solidify": [
+    "v.使…成为固体",
+    "使…变得坚固"
+  ],
+  "scare": [
+    "v.使害怕 n.惊恐",
+    "害怕"
+  ],
+  "surname": [
+    "n.姓"
+  ],
+  "optical": [
+    "adj.光学的",
+    "视力的"
+  ],
+  "simplicity": [
+    "n.简单",
+    "朴素",
+    "单纯",
+    "率直"
+  ],
+  "offspring": [
+    "n.后代",
+    "孩子",
+    "子女"
+  ],
+  "repertoire": [
+    "n.全部本领",
+    "节目",
+    "保留剧目"
+  ],
+  "operational": [
+    "adj.运行的",
+    "操作的"
+  ],
+  "substitute": [
+    "n.代用品",
+    "代替者",
+    "v.用（某人",
+    "某物）代替（另一人",
+    "另一物）",
+    "替代",
+    "代理"
+  ],
+  "scan": [
+    "v.大略翻阅",
+    "浏览报纸等",
+    "细察",
+    "审视"
+  ],
+  "pace": [
+    "n.速度",
+    "步伐"
+  ],
+  "specify": [
+    "v.指明",
+    "详述",
+    "表明"
+  ],
+  "notable": [
+    "adj.重要的",
+    "值得注意的",
+    "显著的"
+  ],
+  "monoculture": [
+    "n.单作",
+    "单种栽培",
+    "单一文化"
+  ],
+  "navigate": [
+    "v.航行",
+    "航海",
+    "驾驶"
+  ],
+  "overwhelming": [
+    "adj.无法抗拒的",
+    "压倒一切的",
+    "势不可挡的",
+    "巨大的"
+  ],
+  "overweight": [
+    "adj.超重的"
+  ],
+  "owe": [
+    "v.归因",
+    "欠债"
+  ],
+  "yoga": [
+    "n.瑜伽"
+  ],
+  "vacuum": [
+    "n.真空",
+    "真空吸尘 v.用吸尘器清扫"
+  ],
+  "poverty": [
+    "n.贫困",
+    "贫穷"
+  ],
+  "spouse": [
+    "n.配偶"
+  ],
+  "pride": [
+    "n.自豪",
+    "得意",
+    "骄傲"
+  ],
+  "wander": [
+    "v.闲逛",
+    "漫游",
+    "走神",
+    "恍惚",
+    "迷路"
+  ],
+  "segment": [
+    "n.部分",
+    "片",
+    "块"
+  ],
+  "sledge": [
+    "n.雪橇",
+    "雪车 v.乘雪橇滑"
+  ],
+  "vivid": [
+    "adj.生动的",
+    "逼真的",
+    "鲜艳的",
+    "鲜明的"
+  ],
+  "meteorological": [
+    "adj.气象学的"
+  ],
+  "treadmill": [
+    "n.累人的活儿",
+    "乏味繁重的工作"
+  ],
+  "portable": [
+    "adj.可搬动的",
+    "便携式的",
+    "手提式的",
+    "轻便的"
+  ],
+  "replenish": [
+    "v.补充"
+  ],
+  "plausible": [
+    "adj.可信的",
+    "似乎正确的",
+    "似有道理的",
+    "花言巧语的"
+  ],
+  "municipal": [
+    "adj.市政的",
+    "市办的",
+    "地方性的"
+  ],
+  "neighbourhood": [
+    "n.社区",
+    "住宅区",
+    "四邻"
+  ],
+  "starve": [
+    "v.使挨饿",
+    "使饿死"
+  ],
+  "outlay": [
+    "n.费用",
+    "开支"
+  ],
+  "reliance": [
+    "n.依靠",
+    "信赖"
+  ],
+  "respectively": [
+    "adv.分别地",
+    "各自地"
+  ],
+  "opposition": [
+    "n.反对"
+  ],
+  "refine": [
+    "v.改进",
+    "改善",
+    "精炼",
+    "提炼",
+    "使精美"
+  ],
+  "mimic": [
+    "v.模仿",
+    "模拟"
+  ],
+  "menace": [
+    "n.威胁",
+    "胁迫",
+    "危险 v.威胁"
+  ],
+  "possession": [
+    "n.所有物",
+    "财产",
+    "持有",
+    "具有"
+  ],
+  "virtue": [
+    "n.优点",
+    "长处",
+    "用处",
+    "美德",
+    "优秀品质",
+    "良好习惯"
+  ],
+  "herd": [
+    "v.牧放（牲畜",
+    "兽群）",
+    "n.群",
+    "兽群",
+    "牛群"
+  ],
+  "capitalism": [
+    "n.资本主义"
+  ],
+  "deteriorate": [
+    "v.变坏",
+    "恶化"
+  ],
+  "declaration": [
+    "n.声明",
+    "宣言",
+    "公告"
+  ],
+  "federal": [
+    "adj.联邦的",
+    "联合的",
+    "联盟的"
+  ],
+  "inquiry": [
+    "n.探究",
+    "询问",
+    "查问",
+    "侦查",
+    "审讯"
+  ],
+  "humanity": [
+    "n.人类",
+    "人性"
+  ],
+  "entail": [
+    "v.需要",
+    "使成为必要",
+    "使承担"
+  ],
+  "crude": [
+    "adj.粗糙的",
+    "粗制的",
+    "天然的"
+  ],
+  "behalf": [
+    "n.代表",
+    "为了……的利益"
+  ],
+  "impress": [
+    "v.留下印象",
+    "引人注目",
+    "压抑"
+  ],
+  "bullet": [
+    "n.子弹",
+    "枪弹"
+  ],
+  "aspiration": [
+    "n.志向",
+    "抱负"
+  ],
+  "cement": [
+    "n.水泥",
+    "v.粘结",
+    "胶合",
+    "巩固",
+    "使团结"
+  ],
+  "defence": [
+    "n.保护",
+    "防御",
+    "辩护"
+  ],
+  "commence": [
+    "v.开始"
+  ],
+  "discharge": [
+    "v.排出",
+    "释放",
+    "卸"
+  ],
+  "episode": [
+    "n.患病期",
+    "发作期",
+    "一段情节",
+    "插曲",
+    "一个事件"
+  ],
+  "itinerary": [
+    "n.旅行路线"
+  ],
+  "investigator": [
+    "n.调查者"
+  ],
+  "decode": [
+    "v.破译",
+    "解码"
+  ],
+  "demonstration": [
+    "n.表演：示范",
+    "展示",
+    "示威"
+  ],
+  "fatigue": [
+    "n.疲劳",
+    "劳累"
+  ],
+  "elaborate": [
+    "adj.精心制作的",
+    "详尽描述的",
+    "复杂的"
+  ],
+  "democratic": [
+    "adj.民主管理的",
+    "民主的",
+    "民主政体的"
+  ],
+  "immune": [
+    "adj.免疫的",
+    "有免疫力的"
+  ],
+  "avenue": [
+    "n.途径",
+    "渠道",
+    "林荫大道",
+    "大街"
+  ],
+  "collate": [
+    "v.核对",
+    "对照",
+    "校勘",
+    "整理"
+  ],
+  "insulate": [
+    "v.使隔音",
+    "使绝缘"
+  ],
+  "beneath": [
+    "prep.在……下方",
+    "在……底下"
+  ],
+  "compromise": [
+    "v.使陷入危险",
+    "妥协",
+    "折中处理",
+    "互让解决",
+    "n.妥协",
+    "折中"
+  ],
+  "commentary": [
+    "n.述评",
+    "评论",
+    "解说",
+    "报道"
+  ],
+  "artifact": [
+    "n.人工制品"
+  ],
+  "handful": [
+    "n.一把",
+    "一小撮",
+    "少数"
+  ],
+  "dive": [
+    "n.跳水",
+    "潜水",
+    "v.潜水",
+    "跳水"
+  ],
+  "consciousness": [
+    "n.意识",
+    "觉悟",
+    "自觉",
+    "知觉"
+  ],
+  "deforestation": [
+    "n.森林砍伐"
+  ],
+  "crush": [
+    "v.压碎",
+    "压坏",
+    "压伤"
+  ],
+  "abundant": [
+    "adj.大量的",
+    "丰盛的",
+    "充裕的"
+  ],
+  "constrain": [
+    "v.限制",
+    "限定",
+    "强迫",
+    "强制"
+  ],
+  "confine": [
+    "v.限制",
+    "仅限于"
+  ],
+  "controversy": [
+    "n.争论",
+    "争议"
+  ],
+  "designate": [
+    "v.指定",
+    "指明",
+    "标明",
+    "指出",
+    "指派",
+    "指定",
+    "adj.已受委派",
+    "候任的"
+  ],
+  "isolation": [
+    "n.隔离",
+    "孤立"
+  ],
+  "flavour": [
+    "n.味道",
+    "v.给……调味"
+  ],
+  "inferior": [
+    "adj.比不上……的",
+    "下级的",
+    "下等的",
+    "质量低劣的"
+  ],
+  "hazard": [
+    "n.危险",
+    "公害",
+    "v.冒……风险"
+  ],
+  "attain": [
+    "v.获得",
+    "达到"
+  ],
+  "acid": [
+    "adj.酸性的",
+    "酸的",
+    "尖刻的",
+    "n.酸"
+  ],
+  "log": [
+    "v.伐木",
+    "记录",
+    "n.原木",
+    "航海日志"
+  ]
+};
+    const book_name = "雅思基础词汇";
+    const totalSeconds = 900;
+
+    let originalWords = Object.keys(vocabularyDB);
+    let words = [...originalWords];
+    let timerInterval = null;
+    let remainingSeconds = totalSeconds;
+    let isRunning = false;
+    let isPaused = false;
+    let submitted = false;
+    let userAnswers = {};
+    let currentMistakes = [];  // 存储错题数据
+
+    // 全局禁用右键/长按菜单（防作弊），但不影响输入框
+    document.addEventListener('contextmenu', function(e) {
+        if (e.target.tagName !== 'INPUT') e.preventDefault();
+    });
+
+    function formatTime(sec) {
+        const mins = Math.floor(sec / 60);
+        const s = sec % 60;
+        return `${mins.toString().padStart(2, '0')}:${s.toString().padStart(2, '0')}`;
+    }
+
+    function updateTimerDisplay() {
+        const timerDiv = document.getElementById('timer');
+        timerDiv.textContent = formatTime(remainingSeconds);
+        if (remainingSeconds <= 60) {
+            timerDiv.classList.add('warning');
+        } else {
+            timerDiv.classList.remove('warning');
+        }
+    }
+
+    function startQuiz() {
+        if (isRunning) return;
+        if (submitted) {
+            alert('已经提交过了，如需重新开始请点击“重置”。');
+            return;
+        }
+        const studentName = document.getElementById('studentName').value.trim();
+        if (!studentName) {
+            alert('请先填写学生姓名！');
+            return;
+        }
+        isRunning = true;
+        isPaused = false;
+        document.getElementById('btnStart').style.display = 'none';
+        document.getElementById('btnPause').style.display = 'inline-block';
+        document.querySelectorAll('.word-input').forEach(inp => inp.disabled = false);
+        document.getElementById('input-0').focus();
+        timerInterval = setInterval(() => {
+            if (!isPaused && remainingSeconds > 0) {
+                remainingSeconds--;
+                updateTimerDisplay();
+                if (remainingSeconds === 0) {
+                    clearInterval(timerInterval);
+                    isRunning = false;
+                    alert('时间到！系统将自动提交。');
+                    submitQuiz();
+                }
+            }
+        }, 1000);
+    }
+
+    function pauseQuiz() {
+        if (!isRunning || isPaused) return;
+        isPaused = true;
+        clearInterval(timerInterval);
+        document.getElementById('btnPause').textContent = '▶ 继续';
+        document.getElementById('btnPause').onclick = resumeQuiz;
+        document.querySelectorAll('.word-input').forEach(inp => inp.disabled = true);
+    }
+
+    function resumeQuiz() {
+        if (!isPaused) return;
+        isPaused = false;
+        document.getElementById('btnPause').textContent = '⏸ 暂停';
+        document.getElementById('btnPause').onclick = pauseQuiz;
+        document.querySelectorAll('.word-input').forEach(inp => inp.disabled = false);
+        timerInterval = setInterval(() => {
+            if (!isPaused && remainingSeconds > 0) {
+                remainingSeconds--;
+                updateTimerDisplay();
+                if (remainingSeconds === 0) {
+                    clearInterval(timerInterval);
+                    isRunning = false;
+                    alert('时间到！系统将自动提交。');
+                    submitQuiz();
+                }
+            }
+        }, 1000);
+    }
+
+    function resetQuiz() {
+        clearInterval(timerInterval);
+        remainingSeconds = totalSeconds;
+        isRunning = false;
+        isPaused = false;
+        submitted = false;
+        userAnswers = {};
+        document.getElementById('timer').textContent = formatTime(totalSeconds);
+        document.getElementById('timer').classList.remove('warning');
+        document.getElementById('btnStart').style.display = 'inline-block';
+        document.getElementById('btnPause').style.display = 'none';
+        document.getElementById('progressFill').style.width = '0%';
+        document.getElementById('resultPanel').classList.remove('show');
+        document.querySelectorAll('.word-item').forEach(item => {
+            item.classList.remove('correct', 'wrong', 'pending');
+        });
+        document.querySelectorAll('.word-input').forEach(inp => { inp.value = ''; inp.disabled = true; });
+        document.querySelectorAll('.word-answer').forEach(ans => ans.textContent = '');
+        updateStats();
+        renderWords();
+    }
+
+    function renderWords() {
+        const grid = document.getElementById('wordGrid');
+        grid.innerHTML = '';
+        words.forEach((word, idx) => {
+            const div = document.createElement('div');
+            div.className = 'word-item';
+            div.id = `item-${idx}`;
+            div.innerHTML = `
+                <div class="word-num">${idx + 1}</div>
+                <div style="flex:1;">
+                    <div style="font-weight:600; margin-bottom:4px;">${word}</div>
+                    <input type="text" class="word-input" id="input-${idx}" 
+                           placeholder="请输入中文释义" 
+                           onkeydown="handleEnter(event, ${idx})"
+                           oninput="onInput(${idx})"
+                           disabled>
+                    <span class="word-answer" id="answer-${idx}"></span>
+                </div>
+            `;
+            grid.appendChild(div);
+        });
+    }
+
+    function handleEnter(e, idx) {
+        if (e.key === 'Enter') {
+            const next = document.getElementById(`input-${idx + 1}`);
+            if (next) next.focus();
+        }
+    }
+
+    function onInput(idx) {
+        const input = document.getElementById(`input-${idx}`);
+        userAnswers[idx] = input.value.trim();
+        updateProgress();
+    }
+
+    function updateProgress() {
+        const filled = Object.values(userAnswers).filter(v => v && v.length > 0).length;
+        const pct = (filled / words.length * 100).toFixed(1);
+        document.getElementById('progressFill').style.width = pct + '%';
+    }
+
+    function normalizeAnswer(ans) {
+        let s = ans.trim().toLowerCase();
+        s = s.replace(/[，,。？?！!、；;：:·“”‘’《》【】（）]/g, '');
+        return s;
+    }
+
+    function fuzzyMatch(userAns, correctList) {
+        if (!userAns) return false;
+        const cleanUser = normalizeAnswer(userAns);
+        if (cleanUser === "") return false;
+        for (let std of correctList) {
+            const cleanStd = normalizeAnswer(std);
+            if (cleanUser === cleanStd) return true;
+            if (cleanUser.includes(cleanStd)) return true;
+            if (cleanStd.includes(cleanUser)) return true;
+        }
+        return false;
+    }
+
+    function submitQuiz() {
+        if (submitted) return;
+        const studentName = document.getElementById('studentName').value.trim();
+        if (!studentName) {
+            alert('请先填写学生姓名！');
+            return;
+        }
+        if (!isRunning && remainingSeconds === totalSeconds) {
+            if (!confirm('尚未开始默写，是否直接提交？')) return;
+        }
+        if (isRunning && !isPaused) pauseQuiz();
+        submitted = true;
+        let correct = 0, wrong = 0, pending = 0;
+        const mistakes = [];
+        words.forEach((word, idx) => {
+            const input = document.getElementById(`input-${idx}`);
+            const item = document.getElementById(`item-${idx}`);
+            const userAns = (input.value || '').trim();
+            const correctAnswers = vocabularyDB[word] || [word];
+            item.classList.remove('correct', 'wrong', 'pending');
+            if (!userAns) {
+                item.classList.add('pending');
+                pending++;
+                mistakes.push({ word, userAns: '(未作答)', correctAns: correctAnswers.join(' / ') });
+            } else if (fuzzyMatch(userAns, correctAnswers)) {
+                item.classList.add('correct');
+                correct++;
+            } else {
+                item.classList.add('wrong');
+                wrong++;
+                mistakes.push({ word, userAns, correctAns: correctAnswers.join(' / ') });
+            }
+            const answerSpan = document.getElementById(`answer-${idx}`);
+            answerSpan.textContent = correctAnswers.join(' / ');
+            item.classList.add('show-answer');
+        });
+        currentMistakes = mistakes;  // 保存错题列表供PDF导出使用
+        document.getElementById('statCorrect').textContent = correct;
+        document.getElementById('statWrong').textContent = wrong;
+        document.getElementById('statPending').textContent = pending;
+        const total = words.length;
+        const score = Math.round(correct / total * 100);
+        const scoreDeg = (correct / total * 360).toFixed(1);
+        document.getElementById('scoreCircle').style.setProperty('--score-deg', scoreDeg + 'deg');
+        document.getElementById('scoreText').textContent = score + '%';
+        let title = '';
+        if (score >= 90) title = '🎉 太棒了！几乎全对！';
+        else if (score >= 80) title = '👍 很好！继续保持！';
+        else if (score >= 60) title = '💪 及格了！还有提升空间！';
+        else title = '📚 需要加油！多复习几遍！';
+        document.getElementById('resultTitle').textContent = title;
+        document.getElementById('resultDesc').textContent = 
+            `学生：${studentName} | 剩余时间 ${formatTime(remainingSeconds)} | 正确 ${correct}/${total} | 错误 ${wrong} | 未答 ${pending}`;
+        const mistakeList = document.getElementById('mistakeList');
+        if (mistakes.length > 0) {
+            mistakeList.innerHTML = '<h4 style="margin-bottom:10px;">📋 错题回顾</h4>' +
+                mistakes.map(m => `
+                    <div class="mistake-item">
+                        <span><strong>${m.word}</strong></span>
+                        <span>你的答案: <span class="your-answer">${m.userAns}</span> → 正确答案: <span class="correct-answer">${m.correctAns}</span></span>
+                    </div>
+                `).join('');
+        } else {
+            mistakeList.innerHTML = '<p style="color:#28a745; font-weight:bold;">🌟 全对！没有任何错误！</p>';
+        }
+        document.getElementById('resultPanel').classList.add('show');
+        document.getElementById('resultPanel').scrollIntoView({ behavior: 'smooth' });
+        clearInterval(timerInterval);
+    }
+
+    function updateStats() {
+        document.getElementById('statTotal').textContent = words.length;
+        document.getElementById('statCorrect').textContent = '0';
+        document.getElementById('statWrong').textContent = '0';
+        document.getElementById('statPending').textContent = words.length;
+    }
+
+    function shuffleWords() {
+        if (isRunning) {
+            if (!confirm('打乱顺序将重置当前进度，是否继续？')) return;
+            resetQuiz();
+        }
+        for (let i = words.length - 1; i > 0; i--) {
+            const j = Math.floor(Math.random() * (i + 1));
+            [words[i], words[j]] = [words[j], words[i]];
+        }
+        renderWords();
+        updateStats();
+    }
+
+    // 构建错题表格HTML
+    function buildMistakeTable() {
+        if (currentMistakes.length === 0) {
+            return '<p style="text-align:center; font-size:16px; color:#28a745;">🌟 恭喜！本次默写全对，没有错误单词！</p>';
+        }
+        let tableHtml = `
+            <table class="pdf-table">
+                <thead>
+                    <tr>
+                        <th style="width:8%">序号</th>
+                        <th style="width:25%">英文单词</th>
+                        <th style="width:33%">你的答案</th>
+                        <th style="width:34%">正确答案</th>
+                    </tr>
+                </thead>
+                <tbody>
+        `;
+        currentMistakes.forEach((mistake, idx) => {
+            tableHtml += `
+                <tr>
+                    <td>${idx + 1}</td>
+                    <td><span class="wrong-word">${mistake.word}</span></td>
+                    <td>${mistake.userAns}</td>
+                    <td><span class="correct-answer-pdf">${mistake.correctAns}</span></td>
+                </tr>
+            `;
+        });
+        tableHtml += `</tbody>
+        </table>`;
+        return tableHtml;
+    }
+
+    // PDF导出功能
+    async function exportToPDF() {
+        if (!submitted) {
+            alert('请先提交批改！');
+            return;
+        }
+        
+        const studentName = document.getElementById('studentName').value.trim() || '未填写';
+        const correctCount = document.getElementById('statCorrect').textContent;
+        const wrongCount = document.getElementById('statWrong').textContent;
+        const pendingCount = document.getElementById('statPending').textContent;
+        const score = document.getElementById('scoreText').textContent;
+        
+        // 构建PDF内容（独立的HTML结构，便于精确控制样式）
+        const mistakeTableHtml = buildMistakeTable();
+        const pdfContent = `
+            <div style="width:100%; max-width:800px; margin:0 auto; padding:20px; font-family:'PingFang SC', 'Microsoft YaHei', -apple-system, sans-serif;">
+                <h1 style="text-align:center; color:#667eea; margin-bottom:20px;">📄 雅思基础词汇 默写报告</h1>
+                <div style="background:#f8f9fa; padding:15px; border-radius:10px; margin-bottom:20px;">
+                    <p><strong>👩‍🎓 学生姓名：</strong> ${studentName}</p>
+                    <p><strong>📅 测试日期：</strong> 2026.05.24</p>
+                    <p><strong>📖 默写范围：</strong> List9,8</p>
+                    <p><strong>📚 测试列表：</strong> C</p>
+                    <p><strong>⏱️ 剩余时间：</strong> ${formatTime(remainingSeconds)}</p>
+                </div>
+                <div style="background:white; border:1px solid #e0e0e0; border-radius:10px; padding:15px; margin-bottom:20px;">
+                    <h3 style="margin:0 0 10px 0; color:#333;">📊 成绩统计</h3>
+                    <ul style="list-style:none; padding:0;">
+                        <li>✅ 正确：<strong>${correctCount}</strong> 题</li>
+                        <li>❌ 错误：<strong>${wrongCount}</strong> 题</li>
+                        <li>⏳ 未答：<strong>${pendingCount}</strong> 题</li>
+                        <li>🏆 正确率：<strong style="color:#667eea; font-size:20px;">${score}</strong></li>
+                    </ul>
+                </div>
+                <div style="background:white; border:1px solid #e0e0e0; border-radius:10px; padding:15px;">
+                    <h3 style="margin:0 0 15px 0; color:#dc3545;">📋 错题详情（表格形式）</h3>
+                    ${mistakeTableHtml}
+                </div>
+                <div style="text-align:center; margin-top:30px; font-size:12px; color:#999;">
+                    生成时间：${new Date().toLocaleString()} | 系统自动生成
+                </div>
+            </div>
+        `;
+        
+        // 将内容放入隐藏容器
+        const container = document.getElementById('pdf-export-container');
+        container.innerHTML = pdfContent;
+        
+        // 显示加载提示
+        const exportBtn = document.querySelector('.btn-export');
+        const originalText = exportBtn.textContent;
+        exportBtn.textContent = '⏳ 正在生成 PDF...';
+        exportBtn.disabled = true;
+        
+        try {
+            // 等待一帧，确保DOM渲染完成
+            await new Promise(resolve => setTimeout(resolve, 100));
+            
+            const element = container;
+            const canvas = await html2canvas(element, {
+                scale: 3,
+                backgroundColor: '#ffffff',
+                useCORS: true,
+                logging: false
+            });
+            
+            const imgData = canvas.toDataURL('image/png', 1.0);
+            // 注意：此处需要使用 window.jspdf 全局对象
+            const { jsPDF } = window.jspdf;
+            const imgWidth = 210;  // A4宽度 mm
+            const pageHeight = 297; // A4高度 mm
+            const imgHeight = (canvas.height * imgWidth) / canvas.width;
+            let pdf = new jsPDF('p', 'mm', 'a4');
+            let heightLeft = imgHeight;
+            let position = 0;
+            
+            pdf.addImage(imgData, 'PNG', 0, position, imgWidth, imgHeight);
+            heightLeft -= pageHeight;
+            
+            while (heightLeft > 0) {
+                position = heightLeft - imgHeight;
+                pdf.addPage();
+                pdf.addImage(imgData, 'PNG', 0, position, imgWidth, imgHeight);
+                heightLeft -= pageHeight;
+            }
+            
+            const filename = `雅思基础词汇_默写报告_${studentName}_${new Date().toISOString().slice(0,10)}.pdf`;
+            pdf.save(filename);
+            
+        } catch (error) {
+            console.error('PDF生成失败:', error);
+            alert('PDF生成失败：' + error.message);
+        } finally {
+            // 恢复按钮
+            exportBtn.textContent = originalText;
+            exportBtn.disabled = false;
+            // 清空隐藏容器
+            container.innerHTML = '';
+        }
+    }
+
+    document.addEventListener('DOMContentLoaded', () => {
+        renderWords();
+        updateStats();
+    });
+</script>
+</body>
+</html>
